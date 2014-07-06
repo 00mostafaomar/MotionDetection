@@ -5,7 +5,16 @@ many parts of this code was copied from another open source applications and i w
 people who helped me including the ones who i borrowed from them the source codes i used...
 you'll find the full documentation on how to install and make it work on windows platform
 the tracking data represented in (x,y,minutes,seconds) comma separated to do any text analysis on it
-if any help needed my email is : mostafa.ghany.omar@gmail.com
+if any help needed my email is : 
+mostafa.ghany.omar@gmail.com
+
+for installing the required tools please use the readme file
+
+Source Code : 
+https://github.com/00mostafaomar/MotionDetection/MotionDetection
+
+here's a video to test on it :
+http://youtu.be/wruegRiT4Vw
 */
 
 import java.awt.*;
@@ -40,8 +49,8 @@ import java.util.concurrent.TimeUnit;
 
 public class MotionDetection
 {
-//  video log file path
-  	private static final String VIDEO_ID = "files/corner1.avi";
+//  video file path
+  	private static final String VIDEO_ID = "files/corner1.mp4";
 //  streaming log file path
   	private static final String STREAMING_TXT = "files/log.txt";
 //  smallest Area to look to contour it
