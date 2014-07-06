@@ -1,0 +1,240 @@
+
+/** This Class is used for Detecting Motion in video files and 
+draw a contour around the movement area and give a time stamp of the frame in the log file
+many parts of this code was copied from another open source applications and i want to thank 
+people who helped me including the ones who i borrowed from them the source codes i used...
+you'll find the full documentation on how to install and make it work on windows platform
+the tracking data represented in (x,y,minutes,seconds) comma separated to do any text analysis on it
+if any help needed my email is : mostafa.ghany.omar@gmail.com
+*/
+
+import java.awt.*;
+import java.io.*;
+import com.googlecode.javacv.*;
+import com.googlecode.javacv.cpp.*;
+import com.googlecode.javacv.cpp.opencv_core.CvContour;
+import com.googlecode.javacv.cpp.opencv_core.CvMemStorage;
+import com.googlecode.javacv.cpp.opencv_core.CvPoint;
+import com.googlecode.javacv.cpp.opencv_core.CvRect;
+import com.googlecode.javacv.cpp.opencv_core.CvScalar;
+import com.googlecode.javacv.cpp.opencv_core.CvSeq;
+import com.googlecode.javacv.cpp.opencv_core.IplImage;
+import com.googlecode.javacpp.*;
+import com.googlecode.javacv.cpp.opencv_core.*;
+import com.googlecode.javacv.cpp.opencv_video.BackgroundSubtractorMOG2;
+
+import static com.googlecode.javacv.cpp.opencv_core.*;
+import static com.googlecode.javacv.cpp.opencv_highgui.*;
+import static com.googlecode.javacv.cpp.opencv_imgproc.*;
+import static com.googlecode.javacv.cpp.opencv_objdetect.*;
+
+//file exceptions
+import java.io.IOException;
+import java.io.FileNotFoundException;
+//file append classes
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.util.Date;
+import java.util.concurrent.TimeUnit;
+
+public class MotionDetection
+{
+//  video log file path
+  	private static final String VIDEO_ID = "files/corner1.avi";
+//  streaming log file path
+  	private static final String STREAMING_TXT = "files/log.txt";
+//  smallest Area to look to contour it
+  	private static final float SMALLEST_AREA = 1000.0f;
+//  cv memory storage to hold objects
+  	private static CvMemStorage contourStorage;
+	
+    public static void main(String[] args) throws Exception 
+	{
+    		// Preload the opencv_objdetect module to work around a known
+    		Loader.load(opencv_objdetect.class);
+    		//create contour storage to save contours in it
+    		contourStorage = CvMemStorage.create();
+    		
+    		//initializing frame grabber
+    		System.out.println("Initializing frame grabber...");
+    		OpenCVFrameGrabber grabber = new OpenCVFrameGrabber(VIDEO_ID);
+    		grabber.start();
+    		//images to work on 
+            IplImage image = null;
+            IplImage prevImage = null;
+            IplImage diff = null;
+    		//start grabbing images from the video the video grabbed image
+            IplImage videoGrabbedImage = grabber.grab();     	   
+    		//get width and height of the image
+    		int width  = videoGrabbedImage.width();
+    		int height = videoGrabbedImage.height();
+    		//getting width, height and midpoints
+//    		System.out.println(width);
+//    		System.out.println(width/2);
+//    		System.out.println(height);
+//    		System.out.println(height/2);
+    		  
+    		//---------------------------------------------------canvas declerations----------------------------------------------------------
+    		    
+    		CanvasFrame grabCanvas = new CanvasFrame("Video");
+    		grabCanvas.setLocation(0, 0);
+    		CanvasFrame thresholdCanvas = new CanvasFrame("threshold Info");
+    		thresholdCanvas.setLocation(width, 0);
+    		
+    		//---------------------------------------------------canvas declerations----------------------------------------------------------
+    		
+    		// processing the grabbed video images
+    		while (grabCanvas.isVisible() && thresholdCanvas.isVisible() && (videoGrabbedImage = grabber.grab()) != null) 
+//    		while ((videoGrabbedImage = grabber.grab()) != null) 
+    	    {
+    			   //---------------------------new processing methods using image difference------------------------------------------------
+    	           cvSmooth(videoGrabbedImage, videoGrabbedImage, CV_GAUSSIAN, 9, 9, 2, 2);
+    	           if (image == null) {
+    	               image = IplImage.create(videoGrabbedImage.width(), videoGrabbedImage.height(), IPL_DEPTH_8U, 1);
+    	               cvCvtColor(videoGrabbedImage, image, CV_RGB2GRAY);
+    	           } 
+    	           else {
+    	               prevImage = IplImage.create(videoGrabbedImage.width(), videoGrabbedImage.height(), IPL_DEPTH_8U, 1);
+    	               prevImage = image;
+    	               image = IplImage.create(videoGrabbedImage.width(), videoGrabbedImage.height(), IPL_DEPTH_8U, 1);
+    	               cvCvtColor(videoGrabbedImage, image, CV_RGB2GRAY);
+    	           }
+    	           if (diff == null) {
+    	               diff = IplImage.create(videoGrabbedImage.width(), videoGrabbedImage.height(), IPL_DEPTH_8U, 1);
+    	           }
+    	           
+//    	    	   long initialTime = System.currentTimeMillis();
+    	    	   videoGrabbedImage = grabber.grab();
+    	    	   //------------------calculating time stamp of each frame---------------------------------
+    		       double frameRate = grabber.getFrameRate();  
+    		       int lengthInFrames = grabber.getLengthInFrames();
+    		       
+    	    	   int currentFrameNumber = grabber.getFrameNumber();
+//    	    	   long lengthInTime = getTime(grabber.getLengthInTime());
+//    	    	   double frameRate = (lengthInFrames / lengthInTime);
+    	    	   
+    	    	   //get timeStamp in Seconds
+    	    	   long timeStamp = (long)(currentFrameNumber / frameRate);
+     	    	   int timeStampSec = (int)TimeUnit.SECONDS.toSeconds(timeStamp);
+		           int timeStampMin = (int)TimeUnit.SECONDS.toMinutes(timeStamp);
+    	    	   //-------------------------------------------------------------------------
+    	    	   if (videoGrabbedImage == null) {
+    	    				System.out.println("Image grab failed");
+    	    				break;
+    	    	   }
+    	    	   if (prevImage != null) {
+    	                // perform ABS difference
+    	                cvAbsDiff(image, prevImage, diff);
+    	                //Filtering:
+    	                //tuning to get the best results, depends upon the quality of the video and many other things
+//    	    	    	cvErode(diff, diff, null, 2); // was 5
+//    	    	    	cvDilate(diff, diff, null, 30); // was 5 ,increase the white space in the image
+//    	    	    	cvSmooth(diff, diff, CV_BLUR, 3); //was 5  // more noise reduction
+    	        		// morph. close
+    	        		cvDilate(diff, diff, null, 10);
+    	        		cvErode(diff, diff, null, 3);
+
+    	        		// 9x9 Median Filter
+    	        		cvSmooth(diff, diff, CV_MEDIAN, 9, 9, 2, 2);
+
+    	        		// 9x9 Gauss Filter
+    	        		cvSmooth(diff, diff, CV_GAUSSIAN, 9, 9, 2, 2);
+
+    	        		// morph. close again
+    	        		cvDilate(diff, diff, null, 25);
+    	        		cvErode(diff, diff, null, 3);
+    	                // do some threshold for wipe away useless details
+    	                cvThreshold(diff, diff, 16, 255, CV_THRESH_BINARY);
+   	    	       }
+    	    	   //------------------------------------------------------------------------------------------------------------------------
+    	    	   //show video of the bit wise picture
+    	    	   thresholdCanvas.showImage(diff);   	    	   
+    	    	   //----------------------------drawing Contours-----------------------------------------------
+       	    	   CvSeq contours = findBiggestContour(diff); //find biggest contour method
+    	    	   CvSeq ptr = new CvSeq();
+
+    	    	   CvRect boundbox;
+    	    	   if(contours!=null && !contours.isNull()) {
+    	    		   		for (ptr = contours; ptr != null; ptr = ptr.h_next()) {
+    	    		   				boundbox = cvBoundingRect(ptr, 0);
+    	    		   				cvRectangle( videoGrabbedImage , cvPoint( boundbox.x(), boundbox.y() ), 
+    	    		   							cvPoint( boundbox.x() + boundbox.width(), boundbox.y() + boundbox.height()),
+    	    		   							cvScalar( 0, 255, 0, 0 ), 1, 0, 0 );
+    	    		   				//coordinates of the box around the found contour
+    	    		   				int x = boundbox.x();
+    	    		   				int y = boundbox.y();
+//------------------------------------------motion positions Data Streaming in file----------------------------------
+    	    		   				try{
+    	    		   						streamData(x + "," + y + "," + Integer.toString(timeStampMin) + "," + Integer.toString(timeStampSec));
+
+    	    		   				}
+    	    		   				catch(Exception e)
+    	    		   				{
+    	    		   						//print error exception
+    	    		   						e.printStackTrace();
+    	    		   				}
+//------------------------------------------------------------------------------------------------------------
+    	    		   				//Check the output Data
+    	    		   				System.out.println(x + "," + y + "," + Integer.toString(timeStampMin) + "," + Integer.toString(timeStampSec));
+    	    		   		}//End for
+    	    	    }//End if
+
+    	    		grabCanvas.showImage(videoGrabbedImage);
+    	    		//close if the video Ended
+    	    		if (currentFrameNumber == (lengthInFrames -1) || currentFrameNumber == (lengthInFrames -2))
+    	    		{
+    	    			//stop grabbing the images
+    	    			grabber.stop();
+    	        	    break;
+    	    		}
+    	    }//End of while loop
+    				//close canvas
+	        	    grabCanvas.dispose();
+	        	    thresholdCanvas.dispose();
+	        	    
+	}//End of Main Method
+//----------------------------------------------------------------------------------------------------------------
+    
+//---------------------------------------finding biggest contour method ----------------------------
+    private static CvSeq findBiggestContour(IplImage imgThreshed)
+    {
+    	CvSeq bigContour = null;
+    	// generate all the contours in the threshold image as a list
+    	CvSeq contours = new CvSeq(null);
+    	cvFindContours(imgThreshed, contourStorage, contours,
+                       Loader.sizeof(CvContour.class),
+                       CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
+    	// find the largest contour in the list based on bounded box size
+    	float maxArea = SMALLEST_AREA;
+//    	CvBox2D maxBox = null;
+    	while (contours != null && !contours.isNull()) {
+    		if (contours.elem_size() > 0) {
+    			CvBox2D box = cvMinAreaRect2(contours, contourStorage);
+    			if (box != null) {
+    				CvSize2D32f size = box.size();
+    				float area = size.width() * size.height();
+    				if (area > maxArea) {
+    					maxArea = area;
+    					bigContour = contours;
+    				}
+    			}
+    		}
+    		contours = contours.h_next();
+    	}
+    	return bigContour;
+    }  // end of findBiggestContour()
+//-------------------------------------------------------------------------------------------------------
+    
+//---------------------------------------Text Streaming method ---------------------------------
+    public static void streamData(String txtToAppend)throws FileNotFoundException, IOException
+    {
+    	 PrintWriter out = new PrintWriter(
+    			 		   new BufferedWriter(
+    			 		   new FileWriter(STREAMING_TXT, true)));
+    	 out.println(txtToAppend);
+    	 out.close();
+    }	
+//-------------------------------------------------------------------------------------------------
+
+}//End of the class
