@@ -41,7 +41,9 @@ If you Faced problems with playing videos install these applications: FFmpeg: is
 
 http://ffmpeg.org/download.html MinGW: provides a complete Open Source programming tool set which is suitable for the development of native MS-Windows applications, and which do not depend on any 3rd-party C-Runtime DLLs.
 
-http://www.mingw.org/category/wiki/download Another helpful links:
+http://www.mingw.org/category/wiki/download 
+
+Another helpful links:
 
 http://docs.opencv.org/2.4/doc/tutorials/introduction/windows_install/windows_install.html
 
