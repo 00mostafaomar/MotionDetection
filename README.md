@@ -1,11 +1,11 @@
-This Class is used for Detecting Motion in video files and 
-draw a contour around the movement area, as well give a time stamp of the frame in the log file
-some parts of this code was copied i want to thank anyone who uploaded opensource applications and they're actually the reason i'm doing this...
+This is a Demo on using Detecting Motion in video files Using Libraries of JavaCV Then draw a Green Rectangle around the movement area, as well give a time stamp of the frame in the log file 
+
 you'll find the full documentation on how to install and make it work on windows platform
 
 tracking data represented in (x,y,minutes,seconds) comma separated to do any text analysis on it
 
-Installing JavaCV on Windows
+
+Installing JavaCV on Windows:
 
 1.Install the runtime components of Microsoft Visual C++ 2010:
 
